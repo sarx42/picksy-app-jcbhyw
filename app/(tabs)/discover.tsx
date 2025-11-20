@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { colors, buttonStyles } from '@/styles/commonStyles';
 import { Movie, ViewerType } from '@/types/Movie';
@@ -50,6 +51,7 @@ const TIME_PERIODS: { label: string; yearFrom: number | null; yearTo: number | n
 ];
 
 export default function DiscoverScreen() {
+  const router = useRouter();
   const [viewerType, setViewerType] = useState<ViewerType>('solo');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [timePeriod, setTimePeriod] = useState(TIME_PERIODS[0]);
@@ -108,6 +110,24 @@ export default function DiscoverScreen() {
       setSnackSuggestion(suggestion);
       setToastVisible(true);
     }
+  };
+
+  const handleFindMovie = () => {
+    console.log('Navigating to MovieResultScreen with filters:', {
+      viewerType,
+      genres: selectedGenres,
+      yearFrom: timePeriod.yearFrom,
+      yearTo: timePeriod.yearTo,
+    });
+    router.push({
+      pathname: '/movie-result',
+      params: {
+        viewerType,
+        genres: JSON.stringify(selectedGenres),
+        yearFrom: timePeriod.yearFrom?.toString() || '',
+        yearTo: timePeriod.yearTo?.toString() || '',
+      },
+    });
   };
 
   const swipeGesture = Gesture.Pan()
@@ -174,6 +194,13 @@ export default function DiscoverScreen() {
             ))}
           </View>
         </View>
+
+        <TouchableOpacity
+          style={[buttonStyles.primary, styles.findMovieButton]}
+          onPress={handleFindMovie}
+        >
+          <Text style={buttonStyles.primaryText}>🎬 Find a Movie</Text>
+        </TouchableOpacity>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -273,6 +300,11 @@ const styles = StyleSheet.create({
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+  },
+  findMovieButton: {
+    width: '100%',
+    marginBottom: 32,
+    paddingVertical: 18,
   },
   loadingContainer: {
     alignItems: 'center',
