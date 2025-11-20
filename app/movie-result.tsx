@@ -31,8 +31,12 @@ export default function MovieResultScreen() {
 
   const viewerType = (params.viewerType as ViewerType) || 'solo';
   const genres = params.genres ? JSON.parse(params.genres as string) : [];
-  const yearFrom = params.yearFrom ? parseInt(params.yearFrom as string) : null;
-  const yearTo = params.yearTo ? parseInt(params.yearTo as string) : null;
+  
+  // Fix: Handle empty strings properly
+  const yearFromParam = params.yearFrom as string;
+  const yearToParam = params.yearTo as string;
+  const yearFrom = yearFromParam && yearFromParam !== '' ? parseInt(yearFromParam) : null;
+  const yearTo = yearToParam && yearToParam !== '' ? parseInt(yearToParam) : null;
 
   const currentMovie = movies[currentIndex];
 
@@ -43,17 +47,25 @@ export default function MovieResultScreen() {
   const fetchMovies = async () => {
     setLoading(true);
     console.log('Fetching movies with filters:', { genres, yearFrom, yearTo });
-    const results = await discoverMovies({
-      genres,
-      yearFrom,
-      yearTo,
-      language: 'en-US',
-      page: 1,
-    });
-    console.log('Fetched movies:', results.length);
-    setMovies(results);
-    setCurrentIndex(0);
-    setLoading(false);
+    try {
+      const results = await discoverMovies({
+        genres,
+        yearFrom,
+        yearTo,
+        language: 'en-US',
+        page: 1,
+      });
+      console.log('Fetched movies:', results.length);
+      if (results.length > 0) {
+        console.log('First movie:', results[0].title);
+      }
+      setMovies(results);
+      setCurrentIndex(0);
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNextMovie = () => {
@@ -106,7 +118,7 @@ export default function MovieResultScreen() {
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Finding the perfect movie...</Text>
             </View>
-          ) : currentMovie ? (
+          ) : movies.length > 0 && currentMovie ? (
             <View style={styles.movieContainer}>
               {currentMovie.posterUrl ? (
                 <Image

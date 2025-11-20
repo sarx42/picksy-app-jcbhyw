@@ -1,8 +1,7 @@
-
 {
   "expo": {
     "name": "Picksy",
-    "slug": "picksy",
+    "slug": "Picksy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -51,5 +50,6 @@
       },
       "TMDB_API_KEY": ""
     }
-  }
+  },
+  "scheme": "Picksy"
 }

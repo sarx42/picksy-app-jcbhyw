@@ -40,11 +40,12 @@ interface DiscoverParams {
 }
 
 export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
-  console.log('Discovering movies with params:', params);
+  console.log('=== DISCOVER MOVIES START ===');
+  console.log('Params:', JSON.stringify(params, null, 2));
   
   // If no API key, use fallback immediately
   if (!API_CONFIG.TMDB_API_KEY) {
-    console.log('TMDB_API_KEY is not set, using fallback movies');
+    console.log('No TMDB_API_KEY found, using fallback movies');
     return filterFallbackMovies(params);
   }
 
@@ -52,6 +53,8 @@ export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
     .map(genre => GENRE_MAP[genre])
     .filter(id => id !== undefined)
     .join(',');
+
+  console.log('Genre IDs:', genreIds);
 
   const url = new URL(`${TMDB_BASE_URL}/discover/movie`);
   url.searchParams.append('api_key', API_CONFIG.TMDB_API_KEY);
@@ -65,51 +68,59 @@ export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
     url.searchParams.append('with_genres', genreIds);
   }
   
-  if (params.yearFrom) {
+  if (params.yearFrom !== null && !isNaN(params.yearFrom)) {
     url.searchParams.append('primary_release_date.gte', `${params.yearFrom}-01-01`);
+    console.log('Year from:', params.yearFrom);
   }
   
-  if (params.yearTo) {
+  if (params.yearTo !== null && !isNaN(params.yearTo)) {
     url.searchParams.append('primary_release_date.lte', `${params.yearTo}-12-31`);
+    console.log('Year to:', params.yearTo);
   }
 
   try {
-    console.log('Fetching from TMDB:', url.toString());
+    console.log('Fetching from TMDB URL:', url.toString());
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      console.log('TMDB fetch failed:', response.status, response.statusText);
+      console.log('TMDB fetch failed with status:', response.status, response.statusText);
       return filterFallbackMovies(params);
     }
     
     const data = await response.json();
-    console.log('TMDB response:', data.results?.length, 'movies');
+    console.log('TMDB response received:', data.results?.length || 0, 'movies');
     
-    const movies: Movie[] = data.results.map((movie: TMDBMovie) => ({
-      id: movie.id,
-      title: movie.title,
-      year: movie.release_date ? new Date(movie.release_date).getFullYear() : null,
-      genres: movie.genre_ids.map(id => {
-        const genreName = Object.keys(GENRE_MAP).find(key => GENRE_MAP[key] === id);
-        return genreName || 'Unknown';
-      }),
-      posterUrl: movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : null,
-      synopsis: movie.overview || 'No synopsis available.',
-      imdbRating: null,
-      rottenTomatoesScore: null,
-      redditScore: null,
-      runtimeMinutes: movie.runtime || null,
-    }));
-
-    // If API returns empty array, use fallback
-    if (movies.length === 0) {
-      console.log('TMDB returned empty results, using fallback movies');
+    if (!data.results || data.results.length === 0) {
+      console.log('TMDB returned empty results, using fallback');
       return filterFallbackMovies(params);
     }
 
+    const movies: Movie[] = data.results.map((movie: TMDBMovie) => {
+      const movieGenres = movie.genre_ids.map(id => {
+        const genreName = Object.keys(GENRE_MAP).find(key => GENRE_MAP[key] === id);
+        return genreName || 'Unknown';
+      }).filter(g => g !== 'Unknown');
+
+      return {
+        id: movie.id,
+        title: movie.title,
+        year: movie.release_date ? new Date(movie.release_date).getFullYear() : null,
+        genres: movieGenres,
+        posterUrl: movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : null,
+        synopsis: movie.overview || 'No synopsis available.',
+        imdbRating: null,
+        rottenTomatoesScore: null,
+        redditScore: null,
+        runtimeMinutes: movie.runtime || null,
+      };
+    });
+
+    console.log('Mapped', movies.length, 'movies from TMDB');
+    console.log('First movie:', movies[0]?.title);
+    console.log('=== DISCOVER MOVIES END ===');
     return movies;
   } catch (error) {
-    console.log('TMDB fetch failed with error:', error);
+    console.log('TMDB fetch error:', error);
     return filterFallbackMovies(params);
   }
 }
@@ -118,36 +129,49 @@ export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
  * Filter fallback movies based on the provided parameters
  */
 function filterFallbackMovies(params: DiscoverParams): Movie[] {
+  console.log('=== FILTERING FALLBACK MOVIES ===');
+  console.log('Filter params:', JSON.stringify(params, null, 2));
+  
   let filtered = [...FALLBACK_MOVIES];
+  console.log('Starting with', filtered.length, 'fallback movies');
 
   // Filter by genres if specified
   if (params.genres.length > 0) {
     filtered = filtered.filter(movie =>
       params.genres.some(genre => movie.genres.includes(genre))
     );
+    console.log('After genre filter:', filtered.length, 'movies');
   }
 
   // Filter by year range if specified
-  if (params.yearFrom && params.yearTo) {
+  if (params.yearFrom !== null && !isNaN(params.yearFrom) && params.yearTo !== null && !isNaN(params.yearTo)) {
     filtered = filtered.filter(movie =>
       movie.year !== null && movie.year >= params.yearFrom! && movie.year <= params.yearTo!
     );
-  } else if (params.yearFrom) {
+    console.log('After year range filter:', filtered.length, 'movies');
+  } else if (params.yearFrom !== null && !isNaN(params.yearFrom)) {
     filtered = filtered.filter(movie =>
       movie.year !== null && movie.year >= params.yearFrom!
     );
-  } else if (params.yearTo) {
+    console.log('After yearFrom filter:', filtered.length, 'movies');
+  } else if (params.yearTo !== null && !isNaN(params.yearTo)) {
     filtered = filtered.filter(movie =>
       movie.year !== null && movie.year <= params.yearTo!
     );
+    console.log('After yearTo filter:', filtered.length, 'movies');
   }
 
   // If filters are too restrictive and we have no results, return all fallback movies
   if (filtered.length === 0) {
     console.log('Filters too restrictive, returning all fallback movies');
-    return FALLBACK_MOVIES;
+    filtered = FALLBACK_MOVIES;
   }
 
-  console.log('Returning', filtered.length, 'filtered fallback movies');
+  console.log('Final filtered count:', filtered.length);
+  if (filtered.length > 0) {
+    console.log('First filtered movie:', filtered[0].title);
+  }
+  console.log('=== FILTERING FALLBACK MOVIES END ===');
+  
   return filtered;
 }
