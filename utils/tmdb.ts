@@ -1,9 +1,8 @@
 
-import Constants from 'expo-constants';
 import { Movie } from '@/types/Movie';
 import { FALLBACK_MOVIES } from './fallbackMovies';
+import { API_CONFIG } from '@/config';
 
-const TMDB_API_KEY = Constants.expoConfig?.extra?.TMDB_API_KEY || process.env.TMDB_API_KEY || '';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 
@@ -44,7 +43,7 @@ export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
   console.log('Discovering movies with params:', params);
   
   // If no API key, use fallback immediately
-  if (!TMDB_API_KEY) {
+  if (!API_CONFIG.TMDB_API_KEY) {
     console.log('TMDB_API_KEY is not set, using fallback movies');
     return filterFallbackMovies(params);
   }
@@ -55,7 +54,8 @@ export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
     .join(',');
 
   const url = new URL(`${TMDB_BASE_URL}/discover/movie`);
-  url.searchParams.append('api_key', TMDB_API_KEY);
+  url.searchParams.append('api_key', API_CONFIG.TMDB_API_KEY);
+  url.searchParams.append('include_adult', 'false');
   url.searchParams.append('language', params.language);
   url.searchParams.append('sort_by', 'popularity.desc');
   url.searchParams.append('page', params.page.toString());
