@@ -7,9 +7,10 @@ interface FilterChipProps {
   label: string;
   selected: boolean;
   onPress: () => void;
+  multiSelect?: boolean;
 }
 
-export default function FilterChip({ label, selected, onPress }: FilterChipProps) {
+export default function FilterChip({ label, selected, onPress, multiSelect = false }: FilterChipProps) {
   return (
     <TouchableOpacity
       style={[styles.chip, selected && styles.chipSelected]}
@@ -25,25 +26,26 @@ export default function FilterChip({ label, selected, onPress }: FilterChipProps
 
 const styles = StyleSheet.create({
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
     backgroundColor: colors.card,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.highlight,
-    marginRight: 8,
-    marginBottom: 8,
+    marginRight: 10,
+    marginBottom: 10,
   },
   chipSelected: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.textSecondary,
   },
   chipTextSelected: {
     color: colors.text,
+    fontWeight: '700',
   },
 });

@@ -1,24 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { colors, buttonStyles } from '@/styles/commonStyles';
-import { Movie, ViewerType } from '@/types/Movie';
-import { discoverMovies } from '@/utils/tmdb';
-import { saveMovie } from '@/utils/storage';
-import { getSnackSuggestion } from '@/utils/snackSuggestions';
-import MovieCard from '@/components/MovieCard';
+import { ViewerType } from '@/types/Movie';
 import FilterChip from '@/components/FilterChip';
-import SnackToast from '@/components/SnackToast';
 
 const VIEWER_TYPES: { label: string; value: ViewerType }[] = [
   { label: 'Solo', value: 'solo' },
@@ -55,61 +48,11 @@ export default function DiscoverScreen() {
   const [viewerType, setViewerType] = useState<ViewerType>('solo');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [timePeriod, setTimePeriod] = useState(TIME_PERIODS[0]);
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [snackSuggestion, setSnackSuggestion] = useState({ emoji: '', title: '', subtitle: '' });
-
-  const currentMovie = movies[currentIndex];
-
-  useEffect(() => {
-    fetchMovies();
-  }, [selectedGenres, timePeriod]);
-
-  const fetchMovies = async () => {
-    setLoading(true);
-    console.log('Fetching movies...');
-    const results = await discoverMovies({
-      genres: selectedGenres,
-      yearFrom: timePeriod.yearFrom,
-      yearTo: timePeriod.yearTo,
-      language: 'en-US',
-      page: 1,
-    });
-    console.log('Fetched movies:', results.length);
-    setMovies(results);
-    setCurrentIndex(0);
-    setLoading(false);
-  };
 
   const handleGenreToggle = (genre: string) => {
     setSelectedGenres(prev =>
       prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
     );
-  };
-
-  const handleShowAnother = () => {
-    if (currentIndex < movies.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      fetchMovies();
-    }
-  };
-
-  const handleSaveToPicks = async () => {
-    if (currentMovie) {
-      await saveMovie(currentMovie);
-      handleShowAnother();
-    }
-  };
-
-  const handlePlayThisOne = () => {
-    if (currentMovie) {
-      const suggestion = getSnackSuggestion(viewerType, currentMovie.genres);
-      setSnackSuggestion(suggestion);
-      setToastVisible(true);
-    }
   };
 
   const handleFindMovie = () => {
@@ -130,15 +73,6 @@ export default function DiscoverScreen() {
     });
   };
 
-  const swipeGesture = Gesture.Pan()
-    .onEnd((event) => {
-      if (event.translationX < -100) {
-        handleShowAnother();
-      } else if (event.translationX > 100) {
-        handleSaveToPicks();
-      }
-    });
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -155,7 +89,11 @@ export default function DiscoverScreen() {
 
         <View style={styles.filterSection}>
           <Text style={styles.filterTitle}>Who is on the couch?</Text>
-          <View style={styles.chipContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalChipContainer}
+          >
             {VIEWER_TYPES.map(type => (
               <FilterChip
                 key={type.value}
@@ -164,26 +102,31 @@ export default function DiscoverScreen() {
                 onPress={() => setViewerType(type.value)}
               />
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.filterSection}>
           <Text style={styles.filterTitle}>Pick your vibe</Text>
-          <View style={styles.chipContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalChipContainer}
+          >
             {GENRES.map(genre => (
               <FilterChip
                 key={genre}
                 label={genre}
                 selected={selectedGenres.includes(genre)}
                 onPress={() => handleGenreToggle(genre)}
+                multiSelect
               />
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.filterSection}>
           <Text style={styles.filterTitle}>Pick a time period</Text>
-          <View style={styles.chipContainer}>
+          <View style={styles.gridChipContainer}>
             {TIME_PERIODS.map(period => (
               <FilterChip
                 key={period.label}
@@ -199,64 +142,9 @@ export default function DiscoverScreen() {
           style={[buttonStyles.primary, styles.findMovieButton]}
           onPress={handleFindMovie}
         >
-          <Text style={buttonStyles.primaryText}>🎬 Find a Movie</Text>
+          <Text style={buttonStyles.primaryText}>Find a movie</Text>
         </TouchableOpacity>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Finding the perfect movie...</Text>
-          </View>
-        ) : currentMovie ? (
-          <GestureDetector gesture={swipeGesture}>
-            <View>
-              <MovieCard movie={currentMovie} />
-              
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={[buttonStyles.primary, styles.button]}
-                  onPress={handlePlayThisOne}
-                >
-                  <Text style={buttonStyles.primaryText}>Play this one</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[buttonStyles.secondary, styles.button]}
-                  onPress={handleShowAnother}
-                >
-                  <Text style={buttonStyles.secondaryText}>Show another</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[buttonStyles.tertiary, styles.button]}
-                  onPress={handleSaveToPicks}
-                >
-                  <Text style={buttonStyles.tertiaryText}>Save to Picks</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.swipeHint}>
-                💡 Swipe left to skip, swipe right to save
-              </Text>
-            </View>
-          </GestureDetector>
-        ) : (
-          <View style={styles.noResultsContainer}>
-            <Text style={styles.noResultsEmoji}>🎬</Text>
-            <Text style={styles.noResultsText}>
-              No matches yet. Try different genres or a different time period.
-            </Text>
-          </View>
-        )}
       </ScrollView>
-
-      <SnackToast
-        emoji={snackSuggestion.emoji}
-        title={snackSuggestion.title}
-        subtitle={snackSuggestion.subtitle}
-        visible={toastVisible}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }
@@ -275,13 +163,14 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 38,
   },
   subtitle: {
     fontSize: 16,
@@ -289,59 +178,26 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   filterSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   filterTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  chipContainer: {
+  horizontalChipContainer: {
+    flexDirection: 'row',
+    paddingRight: 20,
+  },
+  gridChipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   findMovieButton: {
     width: '100%',
-    marginBottom: 32,
+    marginTop: 8,
     paddingVertical: 18,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: 16,
-  },
-  buttonContainer: {
-    marginTop: 20,
-    gap: 12,
-  },
-  button: {
-    width: '100%',
-  },
-  swipeHint: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  noResultsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  noResultsEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  noResultsText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
+    borderRadius: 30,
   },
 });
