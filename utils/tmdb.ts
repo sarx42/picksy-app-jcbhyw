@@ -1,5 +1,7 @@
 
 import Constants from 'expo-constants';
+import { Movie } from '@/types/Movie';
+import { FALLBACK_MOVIES } from './fallbackMovies';
 
 const TMDB_API_KEY = Constants.expoConfig?.extra?.TMDB_API_KEY || process.env.TMDB_API_KEY || '';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -38,12 +40,13 @@ interface DiscoverParams {
   page: number;
 }
 
-export async function discoverMovies(params: DiscoverParams): Promise<any[]> {
+export async function discoverMovies(params: DiscoverParams): Promise<Movie[]> {
   console.log('Discovering movies with params:', params);
   
+  // If no API key, use fallback immediately
   if (!TMDB_API_KEY) {
-    console.error('TMDB_API_KEY is not set');
-    return [];
+    console.log('TMDB_API_KEY is not set, using fallback movies');
+    return filterFallbackMovies(params);
   }
 
   const genreIds = params.genres
@@ -75,14 +78,14 @@ export async function discoverMovies(params: DiscoverParams): Promise<any[]> {
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      console.error('TMDB API error:', response.status, response.statusText);
-      return [];
+      console.log('TMDB fetch failed:', response.status, response.statusText);
+      return filterFallbackMovies(params);
     }
     
     const data = await response.json();
     console.log('TMDB response:', data.results?.length, 'movies');
     
-    return data.results.map((movie: TMDBMovie) => ({
+    const movies: Movie[] = data.results.map((movie: TMDBMovie) => ({
       id: movie.id,
       title: movie.title,
       year: movie.release_date ? new Date(movie.release_date).getFullYear() : null,
@@ -97,8 +100,54 @@ export async function discoverMovies(params: DiscoverParams): Promise<any[]> {
       redditScore: null,
       runtimeMinutes: movie.runtime || null,
     }));
+
+    // If API returns empty array, use fallback
+    if (movies.length === 0) {
+      console.log('TMDB returned empty results, using fallback movies');
+      return filterFallbackMovies(params);
+    }
+
+    return movies;
   } catch (error) {
-    console.error('Error fetching movies from TMDB:', error);
-    return [];
+    console.log('TMDB fetch failed with error:', error);
+    return filterFallbackMovies(params);
   }
+}
+
+/**
+ * Filter fallback movies based on the provided parameters
+ */
+function filterFallbackMovies(params: DiscoverParams): Movie[] {
+  let filtered = [...FALLBACK_MOVIES];
+
+  // Filter by genres if specified
+  if (params.genres.length > 0) {
+    filtered = filtered.filter(movie =>
+      params.genres.some(genre => movie.genres.includes(genre))
+    );
+  }
+
+  // Filter by year range if specified
+  if (params.yearFrom && params.yearTo) {
+    filtered = filtered.filter(movie =>
+      movie.year !== null && movie.year >= params.yearFrom! && movie.year <= params.yearTo!
+    );
+  } else if (params.yearFrom) {
+    filtered = filtered.filter(movie =>
+      movie.year !== null && movie.year >= params.yearFrom!
+    );
+  } else if (params.yearTo) {
+    filtered = filtered.filter(movie =>
+      movie.year !== null && movie.year <= params.yearTo!
+    );
+  }
+
+  // If filters are too restrictive and we have no results, return all fallback movies
+  if (filtered.length === 0) {
+    console.log('Filters too restrictive, returning all fallback movies');
+    return FALLBACK_MOVIES;
+  }
+
+  console.log('Returning', filtered.length, 'filtered fallback movies');
+  return filtered;
 }
